@@ -68,7 +68,6 @@ void scanf(char *format,...)
 		ptr++;
 	}
 	va_end(list);
-
 }
 
 

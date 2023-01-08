@@ -44,20 +44,6 @@ void syscall(unsigned int *args)
 	unsigned int svc_number;
 	svc_number = ((char *) args[6])[-2];
 	
-	// kprintf("svc : %d\n", svc_number);
-
-	
-	// __asm volatile ("MOV %[v], lr": [v] "=r" (string_add));
-
-	// kprintf("String add : %x\n", string_add);
-
-
-	// for(int i = 15; i < 20; i++) {
-	// 	char *ch = args[i];
-	// 	kprintf("Inside syscall : %d, %s, %x\n", i, ch, args[i]);
-	// }
-
-	
 	
 	switch(svc_number)
 	{
@@ -68,9 +54,7 @@ void syscall(unsigned int *args)
 				__sys_read(0, &ch_read);
 				
 				unsigned int string_add = args[19];
-				// kprintf("inside svall : %s\n", (char *)string_add);
 				*((char **)string_add) = ch_read;
-				// kprintf("SYS_read reached. String : %s\n", *((char **)string_add));
 				break;
 			}
 		case SYS_write:

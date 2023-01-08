@@ -31,9 +31,6 @@
 #include <unistd.h>
 /* Write your highlevel I/O details */
 
-// unsigned int empty[128];
-
-
 void write(char* ch) {
 
 

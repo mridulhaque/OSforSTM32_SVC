@@ -42,11 +42,11 @@
 //#include "../include/float.h"
 
 #define HW32_REG(ADDRESS) (*((volatile unsigned long *)(ADDRESS)))
+#define MAX_TASK 8
 
 
 
 uint32_t current_task = 0;
-uint32_t next_task = 1;
 uint32_t magic_number = 0;
 uint32_t total_task = 0;
 uint32_t cur_magic_number = 100001;
@@ -57,33 +57,34 @@ struct tcb {
 	uint32_t psp;
 };
 
-struct tcb tasks[4];
+struct tcb tasks[MAX_TASK];
 
 void unpriv (void) {
-	unsigned int empty[256];
-    for(int i = 0; i < 256; i++) empty[i] = 0;
-
-    // kprintf("Inside Read : %s\n", ch);
+	// prepare a stack for unpriviledged mode
+	const int INITIAL_STACK_SIZE = 256;
+	unsigned int unpriv_stack[INITIAL_STACK_SIZE];
+    for(int i = 0; i < INITIAL_STACK_SIZE; i++) unpriv_stack[i] = 0; // reset the unpriv stack
     
-    task_init_env_2(empty+256);
+	// call an assembly function for turning on unpriviledged mode
+    turn_on_unpriv_mode(unpriv_stack+INITIAL_STACK_SIZE);
 
     __asm volatile (
-        ".global task_init_env_2\n"
-        "task_init_env_2:\n"
-	        "msr psp, r0\n"
-	        "mov r0, #3\n"
-	        "msr control, r0\n"
-	        "isb\n"
+        ".global turn_on_unpriv_mode\n"
+        "turn_on_unpriv_mode:\n"
+	        "msr psp, r0\n" // set the unpriv_stack's last address on psp
+	        "mov r0, #3\n" 
+	        "msr control, r0\n" // set unpriv mode and psp
+	        "isb\n" // throw away any prefetched instructions
     );
 }
 
 void setPSP(unsigned int x) {
 
-    task_init_env_3(x);
+    set_psp_asm(x);
 
     __asm volatile (
-        ".global task_init_env_3\n"
-        "task_init_env_3:\n"
+        ".global set_psp_asm\n"
+        "set_psp_asm:\n"
 	        "msr psp, r0\n"
 	        "isb\n"
     );
@@ -92,43 +93,43 @@ void setPSP(unsigned int x) {
 
 
 
-void thread1 () {
-    printf("Thread 1\n");
-	int i = 0;
-
-	int cnt = 0;
-
-    while(1) {
-        i++;
-        if(i >= 10000000) {
-			int t = getTime();
-			int p = getPid();
-			printf("..........Thread 1 time : %d, pid : %d\n", t, p);
-
-            // printf("in Thread 1 some val reached.\n");
-            i = 0;
-			cnt++;
-			if(cnt == 2) {
-				// reboot();
-				yield();
-				cnt = 0;
-			}
-        }
-    }
-}
-
-void thread2 () {
-    printf("Thread 2\n");
+void task_1 () {
+    printf("Task 1 Started\n");
 	int i = 0;
     while(1) {
         i++;
         if(i >= 10000000) {
 			int t = getTime();
 			int p = getPid();
+			printf(">> Task 1 time : %d, p-id : %d\n", t, p);
+            i = 0;
+        }
+    }
+}
 
-			printf("Thread 2 time : %d, pid : %d\n", t, p);
+void task_2 () {
+    printf("Task 2\n");
+	int i = 0;
+    while(1) {
+        i++;
+        if(i >= 10000000) {
+			int t = getTime();
+			int p = getPid();
+			printf(">> Task 2 time : %d, p-id : %d\n", t, p);
+            i = 0;
+        }
+    }
+}
 
-            // printf("in Thread 2 some val reached.\n");
+void task_3 () {
+    printf("Task 3\n");
+	int i = 0;
+    while(1) {
+        i++;
+        if(i >= 10000000) {
+			int t = getTime();
+			int p = getPid();
+			printf(">> Task 3, p-id : %d\n",  p);
             i = 0;
         }
     }
@@ -136,38 +137,43 @@ void thread2 () {
 
 
 
-uint32_t psp_array[4];
+uint32_t psp_array[MAX_TASK]; 
+int next_task,i;
 
 void PendSV_Handler(void) {
-
-	for(int i = 0; i < total_task; i++) {
+	if(!total_task) return;
+	for(i = 0; i < total_task; i++) {
 		psp_array[i] = tasks[i].psp;
 	}
-	__asm volatile(	"MRS R0, PSP\n"
-					"STMDB R0!, {R4-R11}\n");
+	// store the registers {R4-R11}
+	__asm volatile(	"MRS R0, PSP\n" 
+					"STMDB R0!, {R4-R11}\n"); 
+	
+	next_task = (current_task)%(total_task-1) + 1;
+	// int next_task = 0;
 	__asm volatile("mov R5, %[v]": : [v] "r" (&current_task));
 	__asm volatile("mov R6, %[v]": : [v] "r" (&next_task));
 	__asm volatile("mov R7, %[v]": : [v] "r" (&psp_array));
-	next_task++;
-	if(next_task == total_task) next_task = 0;
-	__asm volatile(
-					"MOV R1, R5\n"
-					"LDR R2, [R1]\n"
-					"MOV R3, R7\n"
-					"STR R0, [R3, R2, LSL #2]\n"
-					"MOV R4, R6\n"
-					"LDR R4, [R4]\n"
-					"STR R4, [R1]\n"
-					"LDR R0, [R3, R4, LSL #2]\n"
-					"LDMIA R0!, {R4-R11}\n"
-					"MSR PSP, R0\n");
 
-	for(int i = 0; i < total_task; i++) {
+	__asm volatile(
+					"MOV R1, R5\n" // store current task address in R1
+					"LDR R2, [R1]\n" // load current task value in R2
+					"MOV R3, R7\n" // load psp array address in R3
+					"STR R0, [R3, R2, LSL #2]\n" // store psp into PSP array current task position
+					"MOV R4, R6\n" // load next task address in R4
+					"LDR R4, [R4]\n" // load next task value in R4
+					"STR R4, [R1]\n" // store next task value into current task
+					"LDR R0, [R3, R4, LSL #2]\n" // load next task PSP into R0
+					"LDMIA R0!, {R4-R11}\n" // load {R4-R11} from next task psp
+					"MSR PSP, R0\n"  // update psp with next task psp
+	);
+
+	for(i = 0; i < total_task; i++) {
 		tasks[i].psp = psp_array[i];
 	}
+
 	magic_number = tasks[current_task].magic_number;
 	__asm volatile("BX LR\n");
-
 }
 
 
@@ -175,16 +181,10 @@ void createThread(unsigned long address)
 {
 	tasks[total_task].magic_number = cur_magic_number++;
 	tasks[total_task].psp = ((unsigned int) tasks[total_task].stack) + (sizeof tasks[total_task].stack) - 16*4;
-	HW32_REG((tasks[total_task].psp + (14 << 2))) = (unsigned long) address;
-	HW32_REG((tasks[total_task].psp + (15 << 2))) = 0x01000000;
+	HW32_REG((tasks[total_task].psp + (14 << 2))) = (unsigned long) address; //PC
+	HW32_REG((tasks[total_task].psp + (15 << 2))) = 0x01000000; //xPSR
 
 	total_task++;
-
-	if(total_task > 1) {
-		next_task = 1;
-	} else {
-		next_task = 0;
-	}
 }
 
 
@@ -194,14 +194,16 @@ void kmain(void)
 
 
 	kprintf("Kmain started.\n");
+	magic_number = tasks[0].magic_number;
+	total_task = 1;
 	
-
-	createThread((unsigned long) thread1);
-	createThread((unsigned long) thread2);
-
 	current_task = 0;
-	setPSP((tasks[current_task].psp) + 16*4);
+	createThread((unsigned long) task_1);
+	createThread((unsigned long) task_2);
+	createThread((unsigned long) task_3);
 
+
+	setPSP((tasks[current_task].psp) + 16*4);
 
 	__NVIC_SetPriority(SysTick_IRQn, 0x2);
 	__NVIC_SetPriority(SVCall_IRQn, 1);
@@ -214,22 +216,16 @@ void kmain(void)
 
 
 	printf(".....................\n");
-
-	int x;
-	char* ch = "ABBBCBNBNBCNBNCBNC";
-
-	scanf("%d %s", &x, &ch);
-
-	printf("Int : %d, String : %s\n", x, ch);
 	
-	magic_number = tasks[0].magic_number;
 
-	thread1();
-
-	kprintf("Kmain ended.\n");
+	// task_1();
 
 	while(1) {
-			
+		int sum = 0;
+		for(int i = 0; i < 10000000; i++) {
+			sum += i;
+		}
+		printf("Waiting for PendSV...\n");
 	}
 }
 

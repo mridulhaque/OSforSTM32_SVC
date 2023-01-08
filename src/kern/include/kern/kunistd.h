@@ -38,7 +38,6 @@
 #include<stdint.h>
 
 extern uint32_t current_task;
-extern uint32_t next_task;
 extern uint32_t magic_number;
 
 void __sys_write(unsigned int fd, char *str);
