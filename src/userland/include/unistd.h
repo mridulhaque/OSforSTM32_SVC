@@ -38,5 +38,6 @@ int utilGetTime();
 void uReboot();
 int uGetPid();
 void uYield();
+void exit();
 
 #endif

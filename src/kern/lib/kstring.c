@@ -122,9 +122,9 @@ void reverse(int lo,int hi, uint8_t* arr)
 }
 
 
+uint8_t arr[1000] = "abcdefgNNNNhijkl";
 uint8_t *float2str(float num, char** str) 
 {
-	char arr[] = "abcdefgNNNNhijkl";
 	int i = 0;
     int isNegative = 0;
     if(num < 0){

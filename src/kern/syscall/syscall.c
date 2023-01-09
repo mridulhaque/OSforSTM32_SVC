@@ -35,6 +35,7 @@
 #include <stdint.h>
 #include <kunistd.h>
 #include <stdlib.h>
+#include <kmain.h>
 
 void syscall(unsigned int *args)
 {
@@ -70,7 +71,12 @@ void syscall(unsigned int *args)
 			}
 			break;	
 		case SYS__exit:
-			break;
+			{
+				int pid = __sys_getpid();
+				__sys_task_kill(pid);
+				__sys_yield();
+				break;
+			}
 		case SYS_getpid:
 			{
 				unsigned int int_add = args[19];

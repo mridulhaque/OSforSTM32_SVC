@@ -30,6 +30,7 @@
  
 #include <stm32_startup.h>
 #include <syscall.h>
+#include <kstdio.h>
 
 void Reset_Handler(void){
 	uint32_t size = (uint32_t)&_edata - (uint32_t)&_sdata;

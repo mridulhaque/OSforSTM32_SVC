@@ -44,6 +44,11 @@
 #define HW32_REG(ADDRESS) (*((volatile unsigned long *)(ADDRESS)))
 #define MAX_TASK 8
 
+#define READY 0
+#define WAITING 1
+#define RUNNING 2
+#define KILLED 3
+
 
 
 uint32_t current_task = 0;
@@ -55,11 +60,20 @@ struct tcb {
 	uint32_t magic_number;
 	long long stack[1024];
 	uint32_t psp;
+	uint8_t status;
 };
 
 struct tcb tasks[MAX_TASK];
 
-void unpriv (void) {
+void __sys_task_kill(uint32_t magic_number)
+{
+	for(int i = 0; i < MAX_TASK; i++)
+	{
+		if(tasks[i].magic_number == magic_number) {tasks[i].status = KILLED; break;}
+	}
+}
+
+void switchToUnpriv (void) {
 	// prepare a stack for unpriviledged mode
 	const int INITIAL_STACK_SIZE = 256;
 	unsigned int unpriv_stack[INITIAL_STACK_SIZE];
@@ -124,13 +138,15 @@ void task_2 () {
 void task_3 () {
     printf("Task 3\n");
 	int i = 0;
+	int cnt = 0;
     while(1) {
         i++;
         if(i >= 10000000) {
-			int t = getTime();
 			int p = getPid();
 			printf(">> Task 3, p-id : %d\n",  p);
             i = 0;
+			cnt++;
+			if(cnt == 3) exit();
         }
     }
 }
@@ -138,7 +154,7 @@ void task_3 () {
 
 
 uint32_t psp_array[MAX_TASK]; 
-int next_task,i;
+int next_task,i, previous_task;
 
 void PendSV_Handler(void) {
 	if(!total_task) return;
@@ -148,8 +164,22 @@ void PendSV_Handler(void) {
 	// store the registers {R4-R11}
 	__asm volatile(	"MRS R0, PSP\n" 
 					"STMDB R0!, {R4-R11}\n"); 
+
+	previous_task = current_task;
+	while(1)
+	{
+		next_task = (previous_task)%(total_task-1) + 1;
+		if(tasks[next_task].status == READY) break;
+		else {
+			if(next_task == current_task) {
+				next_task = 0; break;
+			}
+			else previous_task = next_task;
+		}
+	}
 	
-	next_task = (current_task)%(total_task-1) + 1;
+
+	if(tasks[current_task].status != KILLED) tasks[current_task].status = READY;
 	// int next_task = 0;
 	__asm volatile("mov R5, %[v]": : [v] "r" (&current_task));
 	__asm volatile("mov R6, %[v]": : [v] "r" (&next_task));
@@ -167,7 +197,7 @@ void PendSV_Handler(void) {
 					"LDMIA R0!, {R4-R11}\n" // load {R4-R11} from next task psp
 					"MSR PSP, R0\n"  // update psp with next task psp
 	);
-
+	tasks[current_task].status = RUNNING;
 	for(i = 0; i < total_task; i++) {
 		tasks[i].psp = psp_array[i];
 	}
@@ -183,7 +213,7 @@ void createThread(unsigned long address)
 	tasks[total_task].psp = ((unsigned int) tasks[total_task].stack) + (sizeof tasks[total_task].stack) - 16*4;
 	HW32_REG((tasks[total_task].psp + (14 << 2))) = (unsigned long) address; //PC
 	HW32_REG((tasks[total_task].psp + (15 << 2))) = 0x01000000; //xPSR
-
+	tasks[total_task].status = READY;
 	total_task++;
 }
 
@@ -193,7 +223,7 @@ void kmain(void)
 	__sys_init();
 
 
-	kprintf("Kmain started.\n");
+	kprintf("Starting KMain......\n");
 	magic_number = tasks[0].magic_number;
 	total_task = 1;
 	
@@ -210,13 +240,9 @@ void kmain(void)
 	__sysTick_enable();
 	__NVIC_SetPriority(PendSV_IRQn, 0xFF);
 
-	unpriv();
+	switchToUnpriv();
 
 	__asm volatile("isb");
-
-
-	printf(".....................\n");
-	
 
 	// task_1();
 

@@ -2,6 +2,7 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <kstdio.h>
+#include <kstring.h>
 
 char *convertToStr(char *format, va_list list) {
     char *tr;
@@ -42,7 +43,7 @@ char *convertToStr(char *format, va_list list) {
             }
             // _USART_WRITE(USART2,(uint8_t*)convert(i,10));
             
-            uint8_t* cur = convert(i, 10);
+            uint8_t* cur = (uint8_t *)convert(i, 10);
             int cur_ptr = 0;
             while(cur[cur_ptr] != 0) {
                 ret[ptr++] = cur[cur_ptr++];
@@ -57,7 +58,7 @@ char *convertToStr(char *format, va_list list) {
             }
             // _USART_WRITE(USART2,(uint8_t*)convert(i,8));
 
-            cur = convert(i, 8);
+            cur = (uint8_t *)convert(i, 8);
             cur_ptr = 0;
             while(cur[cur_ptr] != 0) {
                 ret[ptr++] = cur[cur_ptr++];
@@ -74,7 +75,7 @@ char *convertToStr(char *format, va_list list) {
             }
             // _USART_WRITE(USART2,(uint8_t*)convert(i,16));
 
-            cur = convert(i, 16);
+            cur = (uint8_t *)convert(i, 16);
             cur_ptr = 0;
             while(cur[cur_ptr] != 0) {
                 ret[ptr++] = cur[cur_ptr++];
@@ -95,7 +96,7 @@ char *convertToStr(char *format, va_list list) {
             dval = va_arg(list,double);
             // _USART_WRITE(USART2,(uint8_t*)float2str(dval));
 
-            cur = (uint8_t*)float2str(dval);
+            cur = (uint8_t*)float2str(dval, str);
             cur_ptr = 0;
             while(cur[cur_ptr] != 0) {
                 ret[ptr++] = cur[cur_ptr++];

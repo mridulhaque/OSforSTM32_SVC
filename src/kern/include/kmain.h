@@ -30,7 +30,7 @@
 
 #ifndef __KMAIN_H
 #define __KMAIN_H
-
+#include <stdint.h>
 
 #define MAX_TASKS   5
 
@@ -63,6 +63,8 @@
 #define INTERRUPT_DISABLE()  do{__asm volatile ("MOV R0,#0x1"); asm volatile("MSR PRIMASK,R0"); } while(0)
 
 #define INTERRUPT_ENABLE()  do{__asm volatile ("MOV R0,#0x0"); asm volatile("MSR PRIMASK,R0"); } while(0)
+
+void __sys_task_kill(uint32_t magic_number);
 
 #endif /* KMAIN_H */
 

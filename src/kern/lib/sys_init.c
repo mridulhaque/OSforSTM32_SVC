@@ -48,23 +48,6 @@ void __sys_init(void)
 	kprintf("CPUID %x\n", SCB->CPUID);
 	kprintf("OS Version: 1.0\n");
 	kprintf("Time Elapse %d ms\n",__getTime());
-	kprintf("Wellcome ....\r\n");
+	kprintf("Welcome ....\r\n");
 	kprintf("*************************************\r\n");
-
-
-	// unsigned int empty[256];
-    // for(int i = 0; i < 256; i++) empty[i] = 0;
-
-    // // kprintf("Inside Read : %s\n", ch);
-    
-    // task_init_env_2(empty+32);
-
-    // __asm volatile (
-    //     ".global task_init_env_2\n"
-    //     "task_init_env_2:\n"
-	//         "msr psp, r0\n"
-	//         "mov r0, #3\n"
-	//         "msr control, r0\n"
-	//         "isb\n"
-    // );
 }
